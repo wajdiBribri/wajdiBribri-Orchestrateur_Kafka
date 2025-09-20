@@ -1,0 +1,85 @@
+services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports: ["2181:2181"]
+
+  kafka:
+    image: bitnami/kafka:3.5
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  orchestrator:
+    build: .
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - OBJETS_PATH=/app/Objets.json
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  producer_ingest:
+    image: python:3.11-slim
+    command: ["bash", "-c", "pip install aiokafka && python /app/producer_ingest.py"]
+    volumes:
+      - ./producers:/app
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  producer_standardize:
+    image: python:3.11-slim
+    command: ["bash", "-c", "pip install aiokafka && python /app/producer_standardize.py"]
+    volumes:
+      - ./producers:/app
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  producer_application:
+    image: python:3.11-slim
+    command: ["bash", "-c", "pip install aiokafka && python /app/producer_application.py"]
+    volumes:
+      - ./producers:/app
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  kafdrop:
+      image: obsidiandynamics/kafdrop
+      environment:
+        - KAFKA_BROKERCONNECT=kafka:9092
+      ports:
+        - "9000:9000"
+      depends_on:
+        kafka:
+          condition: service_healthy
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - orchestrator
