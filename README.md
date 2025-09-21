@@ -119,7 +119,137 @@ Le projet est organisé comme suit :
 ```
 
 ---
+# Flux Observé : Rôles et Responsabilités
 
+Ce document décrit le flux de traitement des objets dans le système, les rôles de chaque composant et les événements Kafka échangés.
+
+---
+
+## 1. Orchestrateur : Publication de `ObjectReady` pour 1001
+
+**Qui** : L'orchestrateur  
+*Implémentation* : `orchestrator/orchestrator.py` et `orchestrator/app.py`
+
+**Quoi** :  
+- Charge `Objets.json` et construit un graphe de dépendances avec NetworkX.  
+- Identifie l'objet `1001` comme source (sans dépendance, `IdObjet_Parent = null`).  
+- Effectue un tri topologique pour déterminer l'ordre de traitement.  
+- Publie un événement Kafka `ObjectReady` pour l'objet `1001` sur le topic `object.events` via `KafkaClient` (`kafka_client.py`).  
+
+**Pourquoi** :  
+1001 est le premier nœud dans l'ordre topologique, car il n'a pas de dépendances.
+
+---
+
+## 2. Producteur d'ingestion : Traitement de 1001
+
+**Qui** : Producteur d'ingestion  
+*Implémentation* : `producers/producer_ingest.py`
+
+**Quoi** :  
+- Consomme les événements du topic `object.events` via `AIOKafkaConsumer`.  
+- Vérifie si l'événement est `ObjectReady` et si `id_objet` (1001) est dans sa plage (1000-1999).  
+- Simule le traitement de l'objet 1001 (`asyncio.sleep(0.5)`).  
+- Publie un événement `ObjectLoaded` pour 1001 sur le topic `object.events` via `AIOKafkaProducer`.  
+
+**Pourquoi** :  
+Ce producteur gère les objets sources (1000-1999) et simule le travail d'ingestion (extraction de données brutes).
+
+---
+
+## 3. Orchestrateur : Publication de `ObjectReady` pour 2002
+
+**Qui** : L'orchestrateur  
+
+**Quoi** :  
+- Suit l'ordre topologique du graphe.  
+- Identifie que 2002 est prêt à être traité (ses dépendances, comme 1001, sont résolues).  
+- Publie `ObjectReady` pour 2002 sur le topic `object.events`.  
+
+**Pourquoi** :  
+L'ordre topologique garantit que les dépendances de 2002 sont traitées avant.
+
+---
+
+## 4. Producteur de standardisation : Traitement de 2002
+
+**Qui** : Producteur de standardisation  
+*Implémentation* : `producers/producer_standardize.py`
+
+**Quoi** :  
+- Consomme les événements du topic `object.events`.  
+- Vérifie si l'événement est `ObjectReady` et si `id_objet` (2002) est dans sa plage (2000-2999).  
+- Simule le traitement de standardisation (`asyncio.sleep(0.6)`).  
+- Publie `ObjectLoaded` pour 2002.  
+
+**Pourquoi** :  
+Gère la transformation des objets intermédiaires (2000-2999).
+
+---
+
+## 5. Publication et traitement parallèle pour 3005 et 3006
+
+**Qui** :  
+- Orchestrateur : publication des `ObjectReady`  
+- Producteur d'application : traitement des objets  
+
+**Quoi** :  
+
+**Orchestrateur** :  
+- Publie `ObjectReady` pour 3005 et 3006 (dépendances résolues).  
+
+**Producteur d'application** (`producers/producer_application.py`) :  
+- Consomme `ObjectReady`.  
+- Vérifie que les objets (3005, 3006) sont dans sa plage (3000+).  
+- Simule le traitement (`asyncio.sleep(0.8)` par objet).  
+- Publie `ObjectLoaded`.  
+- Peut traiter plusieurs objets en parallèle grâce à la consommation asynchrone Kafka.  
+
+**Pourquoi** :  
+Ces objets sont terminaux (couche application), Kafka permet un traitement parallèle.
+
+---
+
+## 6. Gestion des échecs (exemple 2005)
+
+**Qui** : Producteur de standardisation  
+
+**Quoi** :  
+- Simule un échec forcé sur 2005.  
+- Publie `ObjectFailed` sur le topic `object.events` avec métadonnées d'erreur (`"error": "test forcé de objectfailed"`).  
+
+**Pourquoi** :  
+Tester la gestion des erreurs et la journalisation dans le système.
+
+---
+
+## 7. Résumé des Rôles
+
+| Composant | Rôle principal | Plage d'objets | Temps de traitement |
+|-----------|----------------|----------------|------------------|
+| Orchestrateur | Publie `ObjectReady` en ordre topologique | Tous | - |
+| Producteur d'ingestion | Traite les objets sources | 1000-1999 | 0.5s |
+| Producteur de standardisation | Traite objets intermédiaires | 2000-2999 | 0.6s |
+| Producteur d'application | Traite objets terminaux | 3000+ | 0.8s |
+| Frontend | Affiche événements Kafka en temps réel via SSE | - | - |
+| Kafka | Communication entre producteurs et orchestrateur | - | - |
+
+---
+
+## 8. Endpoints API de l'orchestrateur
+
+- `/orchestrate` : déclenche le processus d'orchestration  
+- `/events/last` : récupère le dernier événement  
+- `/events/stream` : stream SSE des événements en temps réel  
+
+---
+
+## 9. Architecture Kafka
+
+- Tous les échanges d'événements se font via Kafka (`object.events`)  
+- Permet un traitement asynchrone et parallèle des objets
+
+---
 
 ## 🚀 Lancer le projet
 
