@@ -1,9 +1,39 @@
 import asyncio
+from datetime import datetime
+import json
 import networkx as nx
 from typing import List, Set
+import requests
+
 from .utils import load_objets
 from .models import OrchestratorEvent
 from .kafka_client import KafkaClient
+from .metrics import EVENTS_PUBLISHED
+
+
+LOKI_URL = "http://loki:3100/loki/api/v1/push"  # adapte selon ton infra
+
+def log_event_to_loki(event: dict, producer: str):
+    """
+    Envoie l'événement Kafka à Loki pour visualisation en timeline Grafana
+    """
+    ts = int(datetime.utcnow().timestamp() * 1e9)  # ns epoch pour Loki
+    stream = {
+        "stream": {
+            "app": "kafka-orchestrator",
+            "producer": producer,
+            "event_type": event["event_type"],
+        },
+        "values": [
+            [str(ts), json.dumps(event)]
+        ],
+    }
+    payload = {"streams": [stream]}
+    try:
+        requests.post(LOKI_URL, json=payload, timeout=2)
+    except Exception as e:
+        print(f"[WARN] Failed to push event to Loki: {e}")
+
 
 class Orchestrator:
     def __init__(self, objets_path: str, kafka_client: KafkaClient, topic="object.events"):
@@ -54,8 +84,18 @@ class Orchestrator:
 
     async def publish_ready_events(self, order: List[int]):
         for node in order:
-            evt = OrchestratorEvent(event_type="ObjectReady", id_objet=node, meta=self.nodes_meta.get(node))
-            await self.kafka.publish(self.topic, evt.dict(), str(node).encode())
+            evt = OrchestratorEvent(
+                event_type="ObjectReady",
+                id_objet=node,
+                meta=self.nodes_meta.get(node),
+                event_datetime=datetime.now()
+            )
+            evt_dict = evt.dict()
+            evt_dict["event_datetime"] = evt.event_datetime.isoformat()
+
+            await self.kafka.publish(self.topic, evt_dict, str(node).encode())
+            EVENTS_PUBLISHED.labels(status=evt.event_type, producer="orchestrator").inc()
+            log_event_to_loki(evt_dict, producer="orchestrator")
             await asyncio.sleep(0.01)
 
     async def run_once(self):

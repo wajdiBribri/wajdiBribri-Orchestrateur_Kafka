@@ -1,11 +1,48 @@
 import asyncio
+from datetime import datetime
 import json
 import os
 import logging
+
+import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+
+from prometheus_client import Counter, start_http_server
+
+start_http_server(8004)  # port différent pour ce producer
+EVENTS_PUBLISHED = Counter(
+    "events_published_total",
+    "Total events published by producer_application",
+    ["status", "producer"]
+)
 
 log = logging.getLogger("producer_application")
 logging.basicConfig(level=logging.INFO)
+
+
+LOKI_URL = "http://loki:3100/loki/api/v1/push"  # adapte selon ton infra
+
+def log_event_to_loki(event: dict, producer: str):
+    """
+    Envoie l'événement Kafka à Loki pour visualisation en timeline Grafana
+    """
+    ts = int(datetime.utcnow().timestamp() * 1e9)  # ns epoch pour Loki
+    stream = {
+        "stream": {
+            "app": "kafka-orchestrator",
+            "producer": producer,
+            "event_type": event["event_type"],
+        },
+        "values": [
+            [str(ts), json.dumps(event)]
+        ],
+    }
+    payload = {"streams": [stream]}
+    try:
+        requests.post(LOKI_URL, json=payload, timeout=2)
+    except Exception as e:
+        print(f"[WARN] Failed to push event to Loki: {e}")
+
 
 KAFKA = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
 TOPIC = "object.events"
@@ -21,17 +58,23 @@ async def process_event(producer, id_obj):
         loaded_evt = {
             "event_type": "ObjectLoaded",
             "id_objet": id_obj,
-            "meta": {"worker": "application-service"}
+            "meta": {"worker": "application-service"},
+            "event_datetime":datetime.now().isoformat()
         }
         await producer.send_and_wait(TOPIC, json.dumps(loaded_evt).encode(), key=str(id_obj).encode())
+        EVENTS_PUBLISHED.labels(status="ObjectLoaded", producer="application").inc()
+        log_event_to_loki(loaded_evt, producer="producer_application")
         log.info("Application: published ObjectLoaded for %s", id_obj)
     except Exception as e:
         failed_evt = {
             "event_type": "ObjectFailed",
             "id_objet": id_obj,
-            "meta": {"worker": "application-service", "error": str(e)}
+            "meta": {"worker": "application-service", "error": str(e)},
+            "event_datetime":datetime.now().isoformat()
         }
         await producer.send_and_wait(TOPIC, json.dumps(failed_evt).encode(), key=str(id_obj).encode())
+        EVENTS_PUBLISHED.labels(status="ObjectFailed", producer="application").inc()
+        log_event_to_loki(loaded_evt, producer="producer_application")
         log.exception("Application: failed processing %s", id_obj)
 
 async def run():

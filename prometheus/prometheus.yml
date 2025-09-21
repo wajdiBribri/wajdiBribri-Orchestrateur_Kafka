@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'orchestrator'
+    static_configs:
+      - targets: ['orchestrator:8001']
+
+  - job_name: 'producer_ingest'
+    static_configs:
+      - targets: ['producer_ingest:8002']
+
+  - job_name: 'producer_standardize'
+    static_configs:
+      - targets: ['producer_standardize:8003']
+
+  - job_name: 'producer_application'
+    static_configs:
+      - targets: ['producer_application:8004']

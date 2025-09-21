@@ -1,0 +1,121 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "id": null,
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki" 
+      },
+      "description": "Affiche chaque événement Kafka produit (orchestrator + producers) avec détails",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 20,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": true,
+        "showLabels": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{app=\"kafka-orchestrator\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka Events Timeline",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Vue tabulaire des events Kafka",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 2,
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "ts"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "{app=\"kafka-orchestrator\"} | json",
+          "refId": "B"
+        }
+      ],
+      "title": "Kafka Events Table",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "source": "log"
+          }
+        },
+        {
+          "id": "organizeFields",
+          "options": {
+            "excludeByName": true,
+            "include": ["producer", "event_datetime", "event_type", "id_objet"],
+            "rename": {
+              "event_datetime": "Date",
+              "id_objet": "Event ID",
+              "event_type": "Type",
+              "producer": "Producer"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["kafka", "events", "timeline", "loki"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h"]
+  },
+  "timezone": "browser",
+  "title": "Kafka Events Logs Dashboard",
+  "uid": "kafka-events-logs",
+  "version": 1
+}

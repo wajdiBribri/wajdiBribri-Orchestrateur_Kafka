@@ -36,7 +36,7 @@ services:
 
   producer_ingest:
     image: python:3.11-slim
-    command: ["bash", "-c", "pip install aiokafka && python /app/producer_ingest.py"]
+    command: ["bash", "-c", "pip install aiokafka requests prometheus-client && python /app/producer_ingest.py"]
     volumes:
       - ./producers:/app
     environment:
@@ -47,7 +47,7 @@ services:
 
   producer_standardize:
     image: python:3.11-slim
-    command: ["bash", "-c", "pip install aiokafka && python /app/producer_standardize.py"]
+    command: ["bash", "-c", "pip install aiokafka requests prometheus-client && python /app/producer_standardize.py"]
     volumes:
       - ./producers:/app
     environment:
@@ -58,7 +58,7 @@ services:
 
   producer_application:
     image: python:3.11-slim
-    command: ["bash", "-c", "pip install aiokafka && python /app/producer_application.py"]
+    command: ["bash", "-c", "pip install aiokafka requests prometheus-client && python /app/producer_application.py"]
     volumes:
       - ./producers:/app
     environment:
@@ -67,19 +67,68 @@ services:
       kafka:
         condition: service_healthy
 
-  kafdrop:
-      image: obsidiandynamics/kafdrop
-      environment:
-        - KAFKA_BROKERCONNECT=kafka:9092
-      ports:
-        - "9000:9000"
-      depends_on:
-        kafka:
-          condition: service_healthy
-  frontend:
-    build:
-      context: ./frontend
+  # kafdrop:
+  #     image: obsidiandynamics/kafdrop
+  #     environment:
+  #       - KAFKA_BROKERCONNECT=kafka:9092
+  #     ports:
+  #       - "9000:9000"
+  #     depends_on:
+  #       kafka:
+  #         condition: service_healthy
+
+  # kafka-exporter:
+  #   image: danielqsj/kafka-exporter:latest
+  #   environment:
+  #     KAFKA_BROKERS: kafka:9092
+  #     LOG_LEVEL: info
+  #   ports:
+  #     - "9308:9308"  # Prometheus scrape
+  #   depends_on:
+  #     kafka:
+  #         condition: service_healthy
+  
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "4200:80"
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
-      - orchestrator
+      - prometheus
+      - loki
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - ./promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #   ports:
+  #     - "4200:80"
+  #   depends_on:
+  #     - orchestrator

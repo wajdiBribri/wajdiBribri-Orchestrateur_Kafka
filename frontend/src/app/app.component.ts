@@ -21,7 +21,7 @@ export class AppComponent implements OnInit {
   startOrchestration() {
     this.http.post('http://localhost:8000/orchestrate', {}).subscribe((res: any) => {
       this.listenEvents()
-      this.loadGraph();
+      //this.loadGraph();
     });
   }
 
@@ -29,7 +29,8 @@ export class AppComponent implements OnInit {
     const eventSource = new EventSource('http://localhost:8000/events/stream');
     eventSource.onmessage = (event) => {
       this.zone.run(() => {
-        this.events.unshift(JSON.parse(event.data));
+        this.events.push(JSON.parse(event.data))
+        // this.events.unshift(JSON.parse(event.data));
       });
     };
     eventSource.onerror = (err) => {
