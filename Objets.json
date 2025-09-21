@@ -41,8 +41,8 @@
     {
         "IdObjet": 2002,
         "IdObjet_Parent": "1005",
-        "NomObjet": "Projects_Standardized",
-        "NomFichier": "projects_std",
+        "NomObjet": "Projects",
+        "NomFichier": "Projects",
         "Description_Objet": "na",
         "Patern": "na",
         "TypeAuthentification": null,
