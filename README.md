@@ -27,6 +27,38 @@ Ce projet met en place un **orchestrateur** (un service de coordination) basé s
 - 👀 Offrir une bonne **visibilité** grâce à des **API 🌐** et un **flux d’événements en temps réel 📡**.
 
 ## 📊 Architecture du projet
+```mermaid
+flowchart LR
+    subgraph Frontend
+        UI["Interface Web (Suivi en temps réel)"]
+    end
+
+    subgraph Orchestrator
+        O["Lecture Objets.json"]
+        D["Gestion des dépendances (graphe optimisé)"]
+        E["Publication événements Kafka (ObjectReady / Loaded / Failed)"]
+    end
+
+    subgraph Kafka
+        K["Bus de messages"]
+    end
+
+    subgraph Producers
+        P1["Ingestion"]
+        P2["Standardisation"]
+        P3["Application"]
+    end
+
+    O --> D --> E --> K
+    K --> P1
+    K --> P2
+    K --> P3
+    P1 --> K
+    P2 --> K
+    P3 --> K
+    K --> UI
+
+```
 
 ```mermaid
 sequenceDiagram
