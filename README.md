@@ -305,6 +305,8 @@ Tester la gestion des erreurs et la journalisation dans le système.
 | Producteur d'application | Traite objets terminaux | 3000+ | 0.8s |
 | Frontend | Affiche événements Kafka en temps réel via SSE | - | - |
 | Kafka | Communication entre producteurs et orchestrateur | - | - |
+| Grafana | Connecté à Prometheus (et Loki), permet de visualiser les métriques et logs | - | - |
+| Prometheus | Scrape les métriques exposées par tes producteurs/orchestrateur (ex : via prometheus-client) | - | - |
 
 ---
 
