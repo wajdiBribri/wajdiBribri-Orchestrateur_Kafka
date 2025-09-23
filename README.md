@@ -29,35 +29,43 @@ Ce projet met en place un **orchestrateur** (un service de coordination) basé s
 ## 📊 Architecture du projet
 
 ```mermaid
-flowchart LR
-    subgraph Frontend
-        UI["Interface Web (Suivi en temps réel)"]
-    end
+sequenceDiagram
+  autonumber
+  participant FE as Frontend :4200
+  participant ORCH as Orchestrator :8000
+  participant K as Kafka :9092
+  participant ING as Producer Ingest
+  participant STD as Producer Standardize
+  participant APP as Producer Application
+  participant P as Prometheus :9090
+  participant L as Loki :3100
+  participant G as Grafana :3000
+  participant PT as Promtail
 
-    subgraph Orchestrator
-        O["Lecture Objets.json"]
-        D["Gestion des dépendances (graphe optimisé)"]
-        E["Publication événements Kafka (ObjectReady / Loaded / Failed)"]
-    end
+  Note over ORCH: Lit Objets.json et calcule ordre topologique
+  ORCH->>K: produce ObjectReady → orchestrator.events
+  ING->>K: produce → ingest.raw (0.5s)
+  STD->>K: produce → standardize.out (0.6s, fail id 2005)
+  APP->>K: produce → app.events (0.8s)
+  K-->>ORCH: stream events [ingest.raw, standardize.out, app.events, orchestrator.events]
 
-    subgraph Kafka
-        K["Bus de messages"]
-    end
+  FE->>ORCH: GET /sse /status /objects
+  ORCH-->>FE: SSE et JSON (progress, erreurs id 2005)
 
-    subgraph Producers
-        P1["Ingestion"]
-        P2["Standardisation"]
-        P3["Application"]
-    end
-
-    O --> D --> E --> K
-    K --> P1
-    K --> P2
-    K --> P3
-    P1 --> K
-    P2 --> K
-    P3 --> K
-    K --> UI
+  par Metrics
+    ORCH-->>P: /metrics
+    ING-->>P: /metrics
+    STD-->>P: /metrics
+    APP-->>P: /metrics
+    P-->>G: datasource Prometheus
+  and Logs
+    ORCH-->>PT: stdout/stderr
+    ING-->>PT: stdout/stderr
+    STD-->>PT: stdout/stderr
+    APP-->>PT: stdout/stderr
+    PT-->>L: push logs
+    L-->>G: datasource Loki
+  end
 
 ```
 
