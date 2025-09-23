@@ -29,34 +29,55 @@ Ce projet met en place un **orchestrateur** (un service de coordination) basé s
 ## 📊 Architecture du projet
 ```mermaid
 flowchart LR
-    subgraph Frontend
-        UI["Interface Web (Suivi en temps réel)"]
-    end
+  %% === Cluster Docker ===
+  subgraph Runtime["Docker network"]
+    ZK[Zookeeper\n:2181]
+    K[Kafka\nPLAINTEXT :9092]
+    ORCH[Orchestrator API\nFastAPI :8000]
+    ING[Producer Ingest\naiokafka]
+    STD[Producer Standardize\naiokafka]
+    APPP[Producer Application\naiokafka]
+    FE[Frontend Angular\nNginx :4200]
 
-    subgraph Orchestrator
-        O["Lecture Objets.json"]
-        D["Gestion des dépendances (graphe optimisé)"]
-        E["Publication événements Kafka (ObjectReady / Loaded / Failed)"]
+    subgraph Obs["Observability"]
+      P[Prometheus\n:9090]
+      G[Grafana\n:3000]
+      L[Loki\n:3100]
+      PT[Promtail]
     end
+  end
 
-    subgraph Kafka
-        K["Bus de messages"]
-    end
+  %% Core Kafka
+  ZK --- K
 
-    subgraph Producers
-        P1["Ingestion"]
-        P2["Standardisation"]
-        P3["Application"]
-    end
+  %% Producers -> Kafka
+  ING -->|produce| K
+  STD -->|produce| K
+  APPP -->|produce| K
 
-    O --> D --> E --> K
-    K --> P1
-    K --> P2
-    K --> P3
-    P1 --> K
-    P2 --> K
-    P3 --> K
-    K --> UI
+  %% Orchestrator <-> Kafka
+  ORCH <--> K
+
+  %% Frontend -> Orchestrator
+  FE -->|HTTP SSE| ORCH
+
+  %% Prometheus scrape (metrics)
+  P -.-> ORCH
+  P -.-> ING
+  P -.-> STD
+  P -.-> APPP
+
+  %% Logs vers Loki/Grafana
+  PT -->|ship logs| L
+  L -->|datasource| G
+  P -->|datasource| G
+
+  %% Styles
+  classDef svc fill:#eef,stroke:#468,stroke-width:1px;
+  classDef obs fill:#efe,stroke:#484,stroke-width:1px;
+  class ZK,K,ORCH,ING,STD,APPP,FE svc
+  class P,G,L,PT obs
+
 
 ```
 
