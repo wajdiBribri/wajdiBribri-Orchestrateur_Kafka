@@ -97,11 +97,20 @@ Le projet est organisé comme suit :
 ```text
 ├── frontend
 │   ├── src/app
-│   │   ├── app.component.html    # Frontend UI template
-│   │   ├── app.component.ts      # Angular component logic
-│   │   └── event.service.ts      # SSE event handling
-│   ├── Dockerfile                # Docker build for frontend
-│   └── nginx.conf                # Nginx config with SSE proxy
+│   │   ├── app.component.html              # Frontend UI template
+│   │   ├── app.component.ts                # Angular component logic
+│   │   └── event.service.ts                # SSE event handling
+│   ├── Dockerfile                          # Docker build for frontend
+│   └── nginx.conf                          # Nginx config with SSE proxy
+├── grafana
+│   ├── dashboards
+│   │   ├── kafka_events_dashboard.json
+│   │   └── loki_events_dashboard.json
+│   └── provisioning
+│       ├── dashboards
+│       │   └── dashboard.yml
+│       └── datasources
+│           └── datasource.yml
 ├── orchestrator
 │   ├── app.py                    # FastAPI orchestrator
 │   ├── kafka_client.py           # Kafka producer/consumer logic
@@ -112,9 +121,12 @@ Le projet est organisé comme suit :
 │   ├── producer_ingest.py        # Ingestion simulator
 │   ├── producer_standardize.py   # Standardization simulator
 │   ├── producer_application.py   # Application simulator
+├── prometheus
+│   └── prometheus.yml 
 ├── docker-compose.yml            # Orchestrates all services
 ├── Dockerfile                    # Orchestrator Docker build
 ├── Objets.json                   # Input data with object configurations
+├── promtail-config.yaml 
 └── pyproject.toml                # Python dependencies managed with uv
 ```
 
