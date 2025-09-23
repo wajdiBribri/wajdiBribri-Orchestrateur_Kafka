@@ -99,6 +99,26 @@ Kafka 📨
 
 L’orchestrateur, les producteurs, et le frontend.
 
+📊 Prometheus
+•	Rôle : Système de monitoring et métriques.
+•	Scrape les métriques exposées par tes producteurs/orchestrateur (ex : via prometheus-client).
+•	Accessible sur port 9090 pour voir les métriques brutes. 
+
+📈 Grafana
+•	Rôle : Tableaux de bord interactifs.
+•	Connecté à Prometheus (et Loki), permet de visualiser les métriques et logs.
+•	Accessible sur port 3000 (UI web).
+
+📜 Loki
+•	Rôle : Système de gestion de logs, équivalent "Prometheus pour les logs".
+•	Collecte les logs envoyés par Promtail et les rend consultables dans Grafana.
+•	Exposé sur port 3100.
+
+🕵️ Promtail
+•	Rôle : Agent de logs.
+•	Lit les fichiers de logs (/var/log) de l’hôte et/ou des conteneurs, et les envoie à Loki.
+
+
 docker-compose.yml : définit et lance tout le système (frontend + orchestrateur + producteurs).
 
 📦 Dépendances Python
